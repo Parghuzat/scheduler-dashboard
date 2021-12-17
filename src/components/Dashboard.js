@@ -3,6 +3,8 @@ import classnames from "classnames";
 import Loading from "./Loading";
 import Panel from "./Panel";
 import axios from "axios";
+import { setInterview } from "helpers/reducers";
+
 import {
   getTotalInterviews,
   getLeastPopularTimeSlot,
@@ -49,7 +51,7 @@ class Dashboard extends Component {
     Promise.all([
       axios.get("/api/days"),
       axios.get("/api/appointments"),
-      axios.get("/api/interviewers")
+      axios.get("/api/interviewers"),
     ]).then(([days, appointments, interviewers]) => {
       this.setState({
         loading: false,
@@ -58,10 +60,22 @@ class Dashboard extends Component {
         interviewers: interviewers.data
       });
     });
-
+    this.socket = new WebSocket(process.env.REACT_APP_WEBSOCKET_URL);
     if (focused) {
       this.setState({ focused });
     }
+    this.socket.onmessage = event => {
+      const data = JSON.parse(event.data);
+    
+      if (typeof data === "object" && data.type === "SET_INTERVIEW") {
+        this.setState(previousState =>
+          setInterview(previousState, data.id, data.interview)
+        );
+      }
+    };
+  }
+  componentWillUnmount() {
+    this.socket.close();
   }
 
   componentDidUpdate(previousProps, previousState) {
@@ -69,8 +83,6 @@ class Dashboard extends Component {
       localStorage.setItem("focused", JSON.stringify(this.state.focused));
     }
   }
-
-
 
   selectPanel(id) {
     this.setState(previousState => ({
